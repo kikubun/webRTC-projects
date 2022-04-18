@@ -1,0 +1,52 @@
+<video></video>
+<script>
+    (async () => {
+        // pc1、pc2を準備する
+        const pc1 = new RTCPeerConnection();
+        const pc2 = new RTCPeerConnection();
+
+        // pc1、pc2のonicecandidateイベントに合わせて
+        // 相手のcandidateを追加するイベントハンドラを先に入れておく
+        pc1.onicecandidate = (event) => {
+            if (event.candidate) {
+                pc2.addIceCandidate(event.candidate);
+            }
+        }
+
+        pc2.onicecandidate = (event) => {
+            if (event.candidate) {
+                pc1.addIceCandidate(event.candidate);
+            }
+        }
+
+        // カメラ映像を取得する
+        const stream = await navigator.mediaDevices.getUserMedia({video: true});
+
+        // pc1にカメラ映像のトラックを追加する
+        pc1.addTrack( stream.getTracks()[0] );
+
+        // pc2がトラックを受信したとき再生できるようにontrackハンドラを追加する
+        pc2.addEventListener("track", (evt) => {
+            $video = document.querySelector("video");
+            const stream = new MediaStream([evt.track]);
+            $video.srcObject = stream;
+            $video.muted = true;
+            $video.play();
+        });
+
+        // pc1からoffer SDPをつくる
+        const offer = await pc1.createOffer();
+        // pc1のoffer SDPをpc1のローカルSDPとして読み込む
+        await pc1.setLocalDescription( offer );
+
+        // pc1のoffer SDPをpc2のリモートSDPとして読み込む
+        await pc2.setRemoteDescription( offer );
+        // pc2のanswer SDPをつくる
+        const answer = await pc2.createAnswer();
+        // pc2のanswer SDPをpc2のローカルSDPとして読み込む
+        await pc2.setLocalDescription( answer );
+
+        // pc2のanswer SDPをpc1のリモートSDPとして読み込む
+        await pc1.setRemoteDescription( answer );
+    })();
+</script>

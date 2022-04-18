@@ -1,0 +1,67 @@
+<div>
+  <h1>Remote PC</h1>
+  <h2>Candidates</h2>
+  <textarea id="remote-candidate"></textarea>
+  <h2>SDP</h2>
+  <textarea id="remote-sdp"></textarea>
+</div>
+<button>answer</button>
+<div>
+  <h1>Local PC</h1>
+  <h2>Candidates</h2>
+  <textarea id="local-candidate"></textarea>
+  <h2>SDP</h2>
+  <textarea id="local-sdp"></textarea>
+</div>
+<video></video>
+<script>
+const pc = new RTCPeerConnection();
+
+const candidates = [];
+pc.addEventListener("icecandidate", (evt) => {
+  // ICE Candidateを得るたびcandidatesに追加する
+  if (evt.candidate) {
+    candidates.push( evt.candidate );
+  } else {
+    // ICE Gatheringが終了したら、#local-candidateにJSON形式で書き込む
+    const $textarea = document.querySelector("#local-candidate");
+    $textarea.value = JSON.stringify( candidates );
+  }
+});
+
+document.querySelector("button").addEventListener("click", async () => {
+    // #remote-candidateと#remote-sdpの値をJSONとしてパースする
+    const sdp = JSON.parse(document.querySelector("#remote-sdp").value);
+    const candidates = JSON.parse(document.querySelector("#remote-candidate").value);
+  
+    // リモートSDPを読み込む
+    await pc.setRemoteDescription( new RTCSessionDescription( sdp ) );
+    // ICE Candidateをすべて読み込む
+    for(const candidate of candidates) {
+        await pc.addIceCandidate( new RTCIceCandidate( candidate ) );
+    }
+
+    // answer SDPを作る
+    const answer = await pc.createAnswer();
+    // answer SDPをローカルSDPとして読み込む
+    await pc.setLocalDescription( answer );
+    // #local-sdpにanswer SDPをJSON形式で書き込む
+    const $textarea = document.querySelector("#local-sdp");
+    $textarea.value = JSON.stringify( answer );
+});
+
+(async () => {
+  // カメラを取得してaddTrackする
+    const stream = await navigator.mediaDevices.getUserMedia({video: true});
+    pc.addTrack( stream.getTracks()[0] );
+    
+  // 映像を受信したら自動再生する
+  pc.addEventListener("track", (evt) => {
+    const stream = new MediaStream([evt.track]);
+    const $video = document.querySelector("video");
+    $video.srcObject= stream;
+    $video.muted = true;
+    $video.play();
+  });
+})();
+</script>
